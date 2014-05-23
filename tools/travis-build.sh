@@ -33,7 +33,7 @@ ${EJD2CTL} ping
 make test_deps
 ${TOOLS}/set-odbc-password test ${TRAVIS_DB_PASSWORD}
 
-make test_preset TESTSPEC=default.spec PRESET=$TEST_CONFIG
+make test_preset TESTSPEC=full.spec PRESET=$TEST_CONFIG
 
 RAN_TESTS=`cat /tmp/ct_count`
 
