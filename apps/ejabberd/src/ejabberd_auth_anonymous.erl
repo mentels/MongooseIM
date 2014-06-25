@@ -65,6 +65,7 @@ start(Host) ->
     mnesia:create_table(anonymous, [{ram_copies, [node()]},
 				    {type, bag},
 				    {attributes, record_info(fields, anonymous)}]),
+    mnesia:add_table_copy(anonymous, node(), ram_copies),
     %% The hooks are needed to add / remove users from the anonymous tables
     ejabberd_hooks:add(sm_register_connection_hook, Host,
 		       ?MODULE, register_connection, 100),

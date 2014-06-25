@@ -190,6 +190,8 @@ init([Host, Opts]) ->
 			[{ram_copies, [node()]},
 			 {attributes, record_info(fields, muc_online_room)}]),
     mnesia:add_table_copy(muc_online_room, node(), ram_copies),
+    mnesia:add_table_copy(muc_room, node(), disc_copies),
+    mnesia:add_table_copy(muc_registered, node(), disc_copies),
     catch ets:new(muc_online_users, [bag, named_table, public, {keypos, 2}]),
     MyHost = gen_mod:get_opt_host(Host, Opts, <<"conference.@HOST@">>),
     update_tables(MyHost),
@@ -689,11 +691,11 @@ flush() ->
                children = [#xmlel{name = <<"value">>,
                                   children = [#xmlcdata{content = Val}]}]}).
 
-%% @doc Get a pseudo unique Room Name. The Room Name is generated as a hash of 
+%% @doc Get a pseudo unique Room Name. The Room Name is generated as a hash of
 %%      the requester JID, the local time and a random salt.
 %%
 %%      <<"pseudo">> because we don't verify that there is not a room
-%%       with the returned Name already created, nor mark the generated Name 
+%%       with the returned Name already created, nor mark the generated Name
 %%       as <<"already used">>.  But in practice, it is unique enough. See
 %%       http://xmpp.org/extensions/xep-0045.html#createroom-unique
 iq_get_unique(From) ->

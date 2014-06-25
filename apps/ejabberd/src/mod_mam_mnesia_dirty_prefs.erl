@@ -35,6 +35,7 @@ start(Host, Opts) ->
     mnesia:create_table(mam_prefs,
             [{disc_copies, [node()]},
              {attributes, record_info(fields, mam_prefs)}]),
+    mnesia:add_table_copy(mam_prefs, node(), disc_copies),
     case gen_mod:get_module_opt(Host, ?MODULE, pm, false) of
         true ->
             start_pm(Host, Opts);
@@ -154,7 +155,7 @@ set_prefs(Result, _Host, ArcID, ArcJID, DefaultMode, AlwaysJIDs, NeverJIDs) ->
 
 get_prefs({GlobalDefaultMode, _, _}, _Host, _ArcID, ArcJID) ->
     case mnesia:dirty_read(mam_prefs, su_key(ArcJID)) of
-        [] -> 
+        [] ->
             {GlobalDefaultMode, [], []};
         [#mam_prefs{default_mode=DefaultMode,
                     always_rules=ARules, never_rules=NRules}] ->

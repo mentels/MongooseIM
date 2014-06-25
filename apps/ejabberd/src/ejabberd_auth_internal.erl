@@ -63,6 +63,8 @@ start(Host) ->
     mnesia:create_table(reg_users_counter,
 			[{ram_copies, [node()]},
 			 {attributes, record_info(fields, reg_users_counter)}]),
+    mnesia:add_table_copy(passwd, node(), disc_copies),
+    mnesia:add_table_copy(reg_users_counter, node(), ram_copies),
     update_reg_users_counter_table(Host),
     ok.
 
@@ -83,7 +85,7 @@ store_type(Server) ->
     case scram:enabled(Server) of
         false -> plain;
         true -> scram
-    end. 
+    end.
 
 check_password(User, Server, Password) ->
     LUser = jlib:nodeprep(User),

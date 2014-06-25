@@ -256,6 +256,7 @@ start_host_mapping(Host, ServerHost) ->
             [{ram_copies, [node()]},
              {type, set},
              {attributes, record_info(fields, mam_host)}]),
+    mnesia:add_table_copy(mam_host, node(), ram_copies),
     mnesia:dirty_write(#mam_host{host = Host, server_host = ServerHost}).
 
 stop_host_mapping(Host, ServerHost) ->
@@ -307,7 +308,7 @@ archive_room_packet(Packet, FromNick,
         roster -> true
     end,
     case IsInteresting of
-        true -> 
+        true ->
             MessID = generate_message_id(),
             Result = archive_message(Host, MessID, ArcID,
                                      RoomJID, FromJID, SrcJID, incoming, Packet),
@@ -323,7 +324,7 @@ archive_room_packet(Packet, FromNick,
     end.
 
 %% `To' is an account or server entity hosting the archive.
-%% Servers that archive messages on behalf of local users SHOULD expose archives 
+%% Servers that archive messages on behalf of local users SHOULD expose archives
 %% to the user on their bare JID (i.e. `From.luser'),
 %% while a MUC service might allow MAM queries to be sent to the room's bare JID
 %% (i.e `To.luser').
@@ -334,7 +335,7 @@ archive_room_packet(Packet, FromNick,
 room_process_mam_iq(From=#jid{lserver=Host}, To, IQ) ->
     Action = iq_action(IQ),
     case is_action_allowed(Action, From, To) of
-        true  -> 
+        true  ->
             case wait_shaper(Host, Action, From) of
                 ok ->
                     handle_mam_iq(Action, From, To, IQ);
@@ -436,7 +437,7 @@ handle_get_prefs(ArcJID=#jid{}, IQ=#iq{}) ->
               [DefaultMode, AlwaysJIDs, NeverJIDs]),
     ResultPrefsEl = result_prefs(DefaultMode, AlwaysJIDs, NeverJIDs),
     IQ#iq{type = result, sub_el = [ResultPrefsEl]}.
-    
+
 handle_lookup_messages(
         From=#jid{},
         ArcJID=#jid{},
@@ -464,7 +465,7 @@ handle_lookup_messages(
     {error, 'policy-violation'} ->
         ?DEBUG("Policy violation by ~p.", [jlib:jid_to_binary(From)]),
         ErrorEl = ?STANZA_ERRORT(<<"">>, <<"modify">>, <<"policy-violation">>,
-                                 <<"en">>, <<"Too many results">>),          
+                                 <<"en">>, <<"Too many results">>),
         IQ#iq{type = error, sub_el = [ErrorEl]};
     {ok, {TotalCount, Offset, MessageRows}} ->
         {FirstMessID, LastMessID} =
