@@ -123,6 +123,14 @@ init([]) ->
          infinity,
          supervisor,
          [ejabberd_tmp_sup]},
+    NewServiceSupervisor =
+        {ejabberd_service_new_sup,
+         {ejabberd_tmp_sup, start_link, 
+          [ejabberd_service_new_sup, ejabberd_service_new]},
+         permanent,
+         infinity,
+         supervisor,
+         [ejabberd_tmp_sup]},
     HTTPSupervisor =
         {ejabberd_http_sup,
          {ejabberd_tmp_sup, start_link,
