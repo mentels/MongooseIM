@@ -89,6 +89,14 @@
           "xmlns:stream='http://etherx.jabber.org/streams'>">>
        ).
 
+-define(STREAM_FEATURES,
+        <<"<stream:features>"
+          "<bind xmlns='urn:xmpp:component:0'>"
+          "<required/>"
+          "</bind>"
+          "</stream:features>">>
+       ).
+
 -define(STREAM_TRAILER, <<"</stream:stream>">>).
 
 -define(INVALID_HEADER_ERR,
@@ -209,6 +217,7 @@ wait_for_stream({xmlstreamstart, _Name, Attrs}, StateData) ->
                                     StateData#state.streamid,
                                     xml:crypt(To)]),
             send_text(StateData, Header),
+            send_text(StateData, ?STREAM_FEATURES),
             {next_state, wait_for_handshake, StateData};
         _ ->
             send_text(StateData, ?INVALID_HEADER_ERR),
