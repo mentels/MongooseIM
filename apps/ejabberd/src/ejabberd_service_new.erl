@@ -40,7 +40,7 @@
 %% gen_fsm callbacks
 -export([init/1,
          wait_for_stream/2,
-         wait_for_handshake/2,
+         wait_for_bind/2,
          stream_established/2,
          handle_event/3,
          handle_sync_event/4,
@@ -63,7 +63,7 @@
 -type state() :: #state{}.
 
 -type statename() :: wait_for_stream
-                   | wait_for_handshake
+                   | wait_for_bind
                    | stream_established.
 %% FSM handler return value
 -type fsm_return() :: {'stop', Reason :: 'normal', state()}
@@ -95,6 +95,14 @@
           "<required/>"
           "</bind>"
           "</stream:features>">>
+       ).
+
+-define(BIND_RESULT,
+        <<"<iq id='~s' type='result'>"
+          "<bind xmlns='urn:xmpp:component:0'>"
+          "<hostname>~s</hostname>"
+          "</bind>"
+          "</iq>">>
        ).
 
 -define(STREAM_TRAILER, <<"</stream:stream>">>).
@@ -218,7 +226,7 @@ wait_for_stream({xmlstreamstart, _Name, Attrs}, StateData) ->
                                     xml:crypt(To)]),
             send_text(StateData, Header),
             send_text(StateData, ?STREAM_FEATURES),
-            {next_state, wait_for_handshake, StateData};
+            {next_state, wait_for_bind, StateData};
         _ ->
             send_text(StateData, ?INVALID_HEADER_ERR),
             {stop, normal, StateData}
@@ -233,34 +241,26 @@ wait_for_stream(closed, StateData) ->
     {stop, normal, StateData}.
 
 
--spec wait_for_handshake(ejabberd:xml_stream_item(), state()) -> fsm_return().
-wait_for_handshake({xmlstreamelement, El}, StateData) ->
-    #xmlel{name = Name, children = Els} = El,
-    case {Name, xml:get_cdata(Els)} of
-        {<<"handshake">>, Digest} ->
-            case list_to_binary(sha:sha(StateData#state.streamid ++
-                         StateData#state.password)) of
-                Digest ->
-                    send_text(StateData, <<"<handshake/>">>),
-                    lists:foreach(
-                      fun(H) ->
-                              ejabberd_router:register_route(H),
-                              ?INFO_MSG("Route registered for service ~p~n", [H])
-                      end, StateData#state.hosts),
-                    {next_state, stream_established, StateData};
-                _ ->
-                    send_text(StateData, ?INVALID_HANDSHAKE_ERR),
-                    {stop, normal, StateData}
-            end;
-        _ ->
-            {next_state, wait_for_handshake, StateData}
-    end;
-wait_for_handshake({xmlstreamend, _Name}, StateData) ->
+-spec wait_for_bind(ejabberd:xml_stream_item(), state()) -> fsm_return().
+wait_for_bind({xmlstreamelement, BindRequest}, StateData) ->
+    %% TODO: verify the correctness of the request
+    RequestId = xml:get_tag_attr_s(<<"id">>, BindRequest),
+    [BindEl] = BindRequest#xmlel.children,
+    [HostnameEl] = BindEl#xmlel.children,
+    Hostname = xml:get_tag_cdata(HostnameEl),
+    %% TODO: Verify the hostname can be registered
+    ejabberd_router:register_route(Hostname),
+    BindResultMsg = io_lib:format(?BIND_RESULT, [RequestId, Hostname]),
+    send_text(StateData, BindResultMsg),
+    Hosts = StateData#state.hosts,
+    {next_state, stream_established,
+     StateData#state{hosts = [Hostname | Hosts]}};
+wait_for_bind({xmlstreamend, _Name}, StateData) ->
     {stop, normal, StateData};
-wait_for_handshake({xmlstreamerror, _}, StateData) ->
+wait_for_bind({xmlstreamerror, _}, StateData) ->
     send_text(StateData,<<(?INVALID_XML_ERR)/binary,(?STREAM_TRAILER)/binary>>),
     {stop, normal, StateData};
-wait_for_handshake(closed, StateData) ->
+wait_for_bind(closed, StateData) ->
     {stop, normal, StateData}.
 
 
