@@ -105,6 +105,9 @@
           "</iq>">>
        ).
 
+-define(UNBIND_RESULT,
+        <<"<iq id='~s' type='result'/>">>).
+
 -define(STREAM_TRAILER, <<"</stream:stream>">>).
 
 -define(INVALID_HEADER_ERR,
@@ -242,19 +245,9 @@ wait_for_stream(closed, StateData) ->
 
 
 -spec wait_for_bind(ejabberd:xml_stream_item(), state()) -> fsm_return().
-wait_for_bind({xmlstreamelement, BindRequest}, StateData) ->
-    %% TODO: verify the correctness of the request
-    RequestId = xml:get_tag_attr_s(<<"id">>, BindRequest),
-    [BindEl] = BindRequest#xmlel.children,
-    [HostnameEl] = BindEl#xmlel.children,
-    Hostname = xml:get_tag_cdata(HostnameEl),
-    %% TODO: Verify the hostname can be registered
-    ejabberd_router:register_route(Hostname),
-    BindResultMsg = io_lib:format(?BIND_RESULT, [RequestId, Hostname]),
-    send_text(StateData, BindResultMsg),
-    Hosts = StateData#state.hosts,
-    {next_state, stream_established,
-     StateData#state{hosts = [Hostname | Hosts]}};
+wait_for_bind({xmlstreamelement, BindRequest}, StateData0) ->
+    StateData1 = bind(BindRequest, StateData0),
+    {next_state, stream_established, StateData1};
 wait_for_bind({xmlstreamend, _Name}, StateData) ->
     {stop, normal, StateData};
 wait_for_bind({xmlstreamerror, _}, StateData) ->
@@ -265,6 +258,18 @@ wait_for_bind(closed, StateData) ->
 
 
 -spec stream_established(ejabberd:xml_stream_item(), state()) -> fsm_return().
+stream_established({xmlstreamelement,
+                    #xmlel{name = <<"iq">>,
+                           children = [#xmlel{name = <<"bind">>}]}
+                    = BindRequest}, StateData0) ->
+    StateData1 = bind(BindRequest, StateData0),
+    {next_state, stream_established, StateData1};
+stream_established({xmlstreamelement,
+                    #xmlel{name = <<"iq">>,
+                           children = [#xmlel{name = <<"unbind">>}]}
+                    = UnbindRequest}, StateData0) ->
+    StateData1 = unbind(UnbindRequest, StateData0),
+    {next_state, stream_established, StateData1};
 stream_established({xmlstreamelement, El}, StateData) ->
     NewEl = jlib:remove_attr(<<"xmlns">>, El),
     #xmlel{name = Name, attrs = Attrs} = NewEl,
@@ -445,3 +450,28 @@ fsm_limit_opts(Opts) ->
             end
     end.
 
+bind(BindRequest, StateData) ->
+    %% TODO: verify the correctness of the request
+    RequestId = xml:get_tag_attr_s(<<"id">>, BindRequest),
+    [BindEl] = BindRequest#xmlel.children,
+    [HostnameEl] = BindEl#xmlel.children,
+    Hostname = xml:get_tag_cdata(HostnameEl),
+    %% TODO: Verify the hostname can be registered
+    ejabberd_router:register_route(Hostname),
+    BindResultMsg = io_lib:format(?BIND_RESULT, [RequestId, Hostname]),
+    send_text(StateData, BindResultMsg),
+    Hosts = StateData#state.hosts,
+    StateData#state{hosts = [Hostname | Hosts]}.
+
+unbind(BindRequest, StateData) ->
+    %% TODO: verify the correctness of the request
+    RequestId = xml:get_tag_attr_s(<<"id">>, BindRequest),
+    [BindEl] = BindRequest#xmlel.children,
+    [HostnameEl] = BindEl#xmlel.children,
+    Hostname = xml:get_tag_cdata(HostnameEl),
+    %% TODO: Verify the hostname can be unregistered
+    ejabberd_router:unregister_route(Hostname),
+    UnbindResultMsg = io_lib:format(?UNBIND_RESULT, [RequestId]),
+    send_text(StateData, UnbindResultMsg),
+    Hosts = StateData#state.hosts,
+    StateData#state{hosts = lists:delete(Hostname, Hosts)}.
