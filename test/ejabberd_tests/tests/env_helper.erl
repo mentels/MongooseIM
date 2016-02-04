@@ -88,7 +88,7 @@ cont_ip_raw(Net, Cont) ->
 interface_exists(Cont, Intf) ->
     Cmd = docker_exec(Cont, ip_addr_show_interface_exists(Intf)),
     case cmd(Cmd) of
-        "no_interface\n" ->
+        "no_interface" ->
             false;
         _ ->
             true
@@ -101,9 +101,10 @@ wait_for_interfaces(Networks) ->
               wait_for_net_interfaces(Net, Conts, 10)
       end, undefined, Networks).
 
-wait_for_net_interfaces(_, Conts, Retries)
-  when Conts =:= [] orelse Retries =:= 0 ->
+wait_for_net_interfaces(_, [], _) ->
     ok;
+wait_for_net_interfaces(_, _, 0) ->
+    throw(cont_interfaces_down);
 wait_for_net_interfaces(Net, [C | Cs] = Conts, Retries) ->
     case interface_exists(C, Net) of
         true ->
