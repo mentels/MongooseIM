@@ -120,7 +120,9 @@ add_entry_to_etc_hosts(Ip, Name) ->
     "echo '" ++ Ip ++ " " ++ Name ++ "' >> /etc/hosts".
 
 curl(Json, Path) ->
-    io_lib:format("curl -d ~p http://192.168.99.100:8080~p", [Json, Path]).
+    io_lib:format("curl -d ~p ~p~p", [Json, Path,application:get_env(env_helper,
+                                                                     lev_ip,
+                                                                     "localhost")]).
 
 ip_addr_show_interface_exists(Intf) ->
     "ip addr show " ++ atom_to_list(Intf) ++ " 2> /dev/null || echo \"no_interface\"".
