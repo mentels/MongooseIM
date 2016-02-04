@@ -123,11 +123,12 @@ add_entry_to_etc_hosts(Ip, Name) ->
     "echo '" ++ Ip ++ " " ++ Name ++ "' >> /etc/hosts".
 
 curl(Json, Path) ->
-    io_lib:format("curl -d ~p ~p~p", [Json,
-                                      application:get_env(env_helper,
-                                                          lev_ip,
-                                                          "localhost:8080"),
-                                      Path]).
+    lists:flatten(
+      io_lib:format("curl -d ~s ~s~s", [Json,
+                                        application:get_env(env_helper,
+                                                            lev_ip,
+                                                            "localhost:8080"),
+                                        Path])).
 
 ip_addr_show_interface_exists(Intf) ->
     "ip addr show " ++ atom_to_list(Intf) ++ " 2> /dev/null || echo \"no_interface\"".
