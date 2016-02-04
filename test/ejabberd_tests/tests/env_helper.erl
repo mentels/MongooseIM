@@ -78,6 +78,7 @@ update_etc_hosts(Net, Containers) ->
 
 cont_ip_raw(Net, Cont) ->
     Cmd = docker_exec(Cont, ip_addr_show_grep_ip(Net)),
+    io:format("Running: ~p~n",[Cmd]),
     os:cmd(Cmd).
 
 interface_exists(Cont, Intf) ->
@@ -122,9 +123,11 @@ add_entry_to_etc_hosts(Ip, Name) ->
     "echo '" ++ Ip ++ " " ++ Name ++ "' >> /etc/hosts".
 
 curl(Json, Path) ->
-    io_lib:format("curl -d ~p ~p~p", [Json, Path,application:get_env(env_helper,
-                                                                     lev_ip,
-                                                                     "localhost")]).
+    io_lib:format("curl -d ~p ~p~p", [Json,
+                                      application:get_env(env_helper,
+                                                          lev_ip,
+                                                          "localhost:8080"),
+                                      Path]).
 
 ip_addr_show_interface_exists(Intf) ->
     "ip addr show " ++ atom_to_list(Intf) ++ " 2> /dev/null || echo \"no_interface\"".
