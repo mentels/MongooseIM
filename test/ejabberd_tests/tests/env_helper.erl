@@ -35,6 +35,7 @@ create_networks(Networks, Opts) ->
     Cmd2 = curl(binary_to_list(Cens), "/cen/make"),
     [cmd(C) || C <- [Cmd1, Cmd2]],
     wait_for_interfaces(Networks),
+    timer:sleep(500),
     Cmd3 = curl(binary_to_list(CinsListJson), "/cin/import"),
     Cmd4 = curl(binary_to_list(Cins), "/cin/make"),
     [cmd(C) || C <- [Cmd3, Cmd4]],
@@ -65,7 +66,6 @@ run_cmd(Cont, Cmd) ->
 
 -spec update_etc_hosts(atom(), list(atom())) -> ok.
 update_etc_hosts(Net, Containers) ->
-
     ContToIp = lists:foldl(
                  fun(C, Acc) ->
                          maps:put(C, cont_ip_raw(Net, C), Acc)
@@ -73,7 +73,7 @@ update_etc_hosts(Net, Containers) ->
     lists:foreach(
       fun({Cont, Ip}) ->
               [docker_exec(C, add_entry_to_etc_hosts(Ip, Cont)) ||
-                  {C, _} <- maps:to_list(maps:without(Cont, ContToIp))]
+                  {C, _} <- maps:to_list(maps:without([Cont], ContToIp))]
       end, maps:to_list(ContToIp)).
 
 %%--------------------------------------------------------------------
