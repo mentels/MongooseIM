@@ -33,10 +33,11 @@ create_networks(Networks, Opts) ->
     Cins = jiffy:encode(maps:keys(CinsList)),
     Cmd1 = curl(binary_to_list(CenListJson), "/cen/import"),
     Cmd2 = curl(binary_to_list(Cens), "/cen/make"),
+    [os:cmd(C) || C <- [Cmd1, Cmd2]],
     wait_for_interfaces(Networks),
     Cmd3 = curl(binary_to_list(CinsListJson), "/cin/import"),
     Cmd4 = curl(binary_to_list(Cins), "/cin/make"),
-    [os:cmd(C) || C <- [Cmd1, Cmd2, Cmd3, Cmd4]],
+    [os:cmd(C) || C <- [Cmd3, Cmd4]],
     lists:foreach(
       fun(Net) ->
               update_etc_hosts(Net, maps:get(Net, Networks))
@@ -91,18 +92,19 @@ interface_exists(Cont, Intf) ->
 wait_for_interfaces(Networks) ->
     maps:fold(
       fun(Net, Conts, _) ->
-              wait_for_net_interfaces(Net, Conts)
+              wait_for_net_interfaces(Net, Conts, 10)
       end, undefined, Networks).
 
-wait_for_net_interfaces(_, []) ->
+wait_for_net_interfaces(_, Conts, Retries)
+  when Conts =:= [] orelse Retries =:= 0 ->
     ok;
-wait_for_net_interfaces(Net, [C | Cs] = Conts) ->
+wait_for_net_interfaces(Net, [C | Cs] = Conts, Retries) ->
     case interface_exists(C, Net) of
         true ->
-            wait_for_net_interfaces(Net, Cs),
-            timer:sleep(100);
+            wait_for_net_interfaces(Net, Cs, Retries);
         false ->
-            wait_for_net_interfaces(Net, Conts)
+            timer:sleep(100),
+            wait_for_net_interfaces(Net, Conts, Retries-1)
     end.
 
 %%--------------------------------------------------------------------
