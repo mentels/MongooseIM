@@ -33,11 +33,11 @@ create_networks(Networks, Opts) ->
     Cins = jiffy:encode(maps:keys(CinsList)),
     Cmd1 = curl(binary_to_list(CenListJson), "/cen/import"),
     Cmd2 = curl(binary_to_list(Cens), "/cen/make"),
-    [os:cmd(C) || C <- [Cmd1, Cmd2]],
+    [cmd(C) || C <- [Cmd1, Cmd2]],
     wait_for_interfaces(Networks),
     Cmd3 = curl(binary_to_list(CinsListJson), "/cin/import"),
     Cmd4 = curl(binary_to_list(Cins), "/cin/make"),
-    [os:cmd(C) || C <- [Cmd3, Cmd4]],
+    [cmd(C) || C <- [Cmd3, Cmd4]],
     lists:foreach(
       fun(Net) ->
               update_etc_hosts(Net, maps:get(Net, Networks))
@@ -46,7 +46,7 @@ create_networks(Networks, Opts) ->
 -spec destroy_network(atom() | list(atom())) -> ok.
 destroy_network(NetNames) ->
     NetNames1 = binary_to_list(jiffy:encode(NetNames)),
-    os:cmd(curl(NetNames1, "/cen/destroy")).
+    cmd(curl(NetNames1, "/cen/destroy")).
 
 
 -spec cont_ip(atom(), atom()) -> inet:ip4_address().
@@ -76,15 +76,18 @@ update_etc_hosts(Net, Containers) ->
 %% Helpers
 %%--------------------------------------------------------------------
 
+cmd(Cmd) ->
+    string:strip(os:cmd(Cmd), both, $\n).
+
 
 cont_ip_raw(Net, Cont) ->
     Cmd = docker_exec(Cont, ip_addr_show_grep_ip(Net)),
     io:format("Running: ~p~n",[Cmd]),
-    os:cmd(Cmd).
+    cmd(Cmd).
 
 interface_exists(Cont, Intf) ->
     Cmd = docker_exec(Cont, ip_addr_show_interface_exists(Intf)),
-    case os:cmd(Cmd) of
+    case cmd(Cmd) of
         "no_interface\n" ->
             false;
         _ ->
