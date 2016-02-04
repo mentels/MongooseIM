@@ -117,7 +117,7 @@ docker_exec(Cont, Cmd) ->
     "docker exec " ++ atom_to_list(Cont) ++ " " ++ Cmd.
 
 ip_addr_show_grep_ip(Intf) ->
-    "ip addr show " ++ atom_to_list(Intf)  ++ "| grep \"inet \" | awk '{print $2}' | cut -d/ -f1".
+    "ip addr show " ++ atom_to_list(Intf)  ++ "| grep 'inet ' | awk '{print $2}' | cut -d/ -f1".
 
 
 add_entry_to_etc_hosts(Ip, Name) ->
