@@ -52,8 +52,12 @@ destroy_network(NetNames) ->
 -spec cont_ip(atom(), atom()) -> inet:ip4_address().
 cont_ip(NetName, Cont) ->
     RawAddr = cont_ip_raw(NetName, Cont),
-    {ok, Addr} = inet_parse:ipv4_address(RawAddr),
-    Addr.
+    case inet_parse:ipv4_address(RawAddr) of
+        {ok, Addr} ->
+            Addr;
+        {error, einval} ->
+            {error, {container_is_not_in_network, NetName}}
+    end.
 
 -spec run_cmd(atom() | list(atom()), string()) -> ok.
 run_cmd(Cont, Cmd) ->
