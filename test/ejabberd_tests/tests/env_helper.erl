@@ -61,6 +61,7 @@ run_cmd(Cont, Cmd) ->
 
 -spec update_etc_hosts(atom(), list(atom())) -> ok.
 update_etc_hosts(Net, Containers) ->
+
     ContToIp = lists:foldl(
                  fun(C, Acc) ->
                          maps:put(C, cont_ip_raw(Net, C), Acc)
@@ -125,11 +126,11 @@ add_entry_to_etc_hosts(Ip, Name) ->
 
 curl(Json, Path) ->
     lists:flatten(
-      io_lib:format("curl -d ~s ~s~s", [Json,
-                                        application:get_env(env_helper,
-                                                            lev_ip,
-                                                            "localhost:8080"),
-                                        Path])).
+      io_lib:format("curl -d '~s' ~s~s", [Json,
+                                          application:get_env(env_helper,
+                                                              lev_ip,
+                                                              "localhost:8080"),
+                                          Path])).
 
 ip_addr_show_interface_exists(Intf) ->
     "ip addr show " ++ atom_to_list(Intf) ++ " 2> /dev/null || echo \"no_interface\"".
