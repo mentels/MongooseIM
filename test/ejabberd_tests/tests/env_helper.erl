@@ -130,7 +130,7 @@ ip_addr_show_grep_ip(Intf) ->
 
 
 add_entry_to_etc_hosts(Ip, Name) ->
-    "echo '" ++ Ip ++ " " ++ Name ++ "' >> /etc/hosts".
+    lists:flatten(io_lib:format("echo ' ~s ~p >> /etc/hosts", [Ip, Name])).
 
 curl(Json, Path) ->
     lists:flatten(
