@@ -21,16 +21,19 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--define(TEST_FILE(Config, Filename),
+-define(TEST_FILE(Filename, Config),
         filename:join([?config(data_dir, Config), Filename])).
 -define(ENV_DSC(Config), ?TEST_FILE("env.yaml", Config)).
+
+-define(VMARGS, "/opt/mongooseim/rel/mongooseim/etc/vm.args").
+-define(MIM_CTL, "/opt/mongooseim/rel/mongooseim/bin/mongooseimctl").
 
 %%--------------------------------------------------------------------
 %% Suite configuration
 %%--------------------------------------------------------------------
 
 all() ->
-    [test/1].
+    [test1].
 
 
 %%--------------------------------------------------------------------
@@ -49,8 +52,13 @@ init_per_testcase(_, Config) ->
     env_helper:create_networks(#{clustering => [mim1, mim2],
                                  clients => [mim1, mim2]},
                                #{update_etc_hosts => [clustering]}),
-    %% Start the apps in the containers; appropriate env variables should be already set in the env.yaml
-    env_helper:run_cmd([mim1, mim2], "./start.sh"),
+
+    %% configure the cluster and run
+    [env_helper:run_cmd(N, change_mim_sname_cmd(N)) || N <- [mim1, mim2]],
+    env_helper:run_cmd(mim1, mim_ctl_cmd(start)),
+    env_helper:run_cmd(mim2, mim_ctl_cmd('add_to_cluster mongooseim@mim1')),
+    env_helper:run_cmd(mim2, mim_ctl_cmd(start)),
+
     %% Port is known from the configuration passed to the container
     Endpoints = [{Cont, env_helper:cont_ip(clients, Cont), Port}
                  || {Cont, Port} <- [{mim1, 5222}, {mim2, 5223}]],
@@ -69,7 +77,17 @@ test1(Config) ->
      || {_, I, P} <- ?config(clients_endpoints, Config)],
     ok.
     
+%%--------------------------------------------------------------------
+%% Helpers
+%%--------------------------------------------------------------------
 
+change_mim_sname_cmd(Hostname) ->
+    io_lib:format(
+      "sed -i 's/sname mongooseim@localhost/sname mongooseim@~p/g' ~s ",
+      [Hostname, ?VMARGS]).
+
+mim_ctl_cmd(Cmd) ->
+    io_lib:format("~s ~s", [?MIM_CTL, Cmd]).
 
     
 

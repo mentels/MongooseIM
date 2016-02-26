@@ -39,6 +39,7 @@ create_networks(Networks, Opts) ->
     Cmd3 = curl(binary_to_list(CinsListJson), "/cin/import"),
     Cmd4 = curl(binary_to_list(Cins), "/cin/make"),
     [cmd(C) || C <- [Cmd3, Cmd4]],
+    
     lists:foreach(
       fun(Net) ->
               update_etc_hosts(Net, maps:get(Net, Networks))
@@ -57,39 +58,67 @@ cont_ip(NetName, Cont) ->
         {ok, Addr} ->
             Addr;
         {error, einval} ->
-            {error, {container_is_not_in_network, NetName}}
+            {error, {container_not_in_network, NetName}}
     end.
 
 -spec run_cmd(atom() | list(atom()), string()) -> ok.
+run_cmd(Conts, Cmd) when is_list(Conts) ->
+    [run_cmd(C, Cmd) || C <- Conts];
 run_cmd(Cont, Cmd) ->
-    docker_exec(Cont, Cmd).
+    cmd(docker_exec(Cont, Cmd)).
 
 -spec update_etc_hosts(atom(), list(atom())) -> ok.
 update_etc_hosts(Net, Containers) ->
     ContToIp = lists:foldl(
                  fun(C, Acc) ->
-                         maps:put(C, cont_ip_raw(Net, C), Acc)
+                         maps:put(C,
+                                  with_retries(
+                                    fun() -> cont_ip_raw(Net, C) end,
+                                    fun(IpRes) -> IpRes =:= "" end,
+                                    5),
+                                  Acc)
                  end, #{}, Containers),
     lists:foreach(
       fun({Cont, Ip}) ->
-              [docker_exec(C, add_entry_to_etc_hosts(Ip, Cont)) ||
-                  {C, _} <- maps:to_list(maps:without([Cont], ContToIp))]
+              [begin
+                   Cmd = docker_exec(C, add_entry_to_etc_hosts(Ip, Cont)),
+                   cmd(Cmd)
+               end || {C, _} <- maps:to_list(maps:without([Cont], ContToIp))]
       end, maps:to_list(ContToIp)).
 
 %%--------------------------------------------------------------------
 %% Helpers
 %%--------------------------------------------------------------------
 
-cmd(Cmd) ->
-    string:strip(os:cmd(Cmd), both, $\n).
+cmd(Cmd0) ->
+    Cmd1 = lists:flatten(Cmd0),
+    io:format("Running: ~p~n",[Cmd1]),
+    string:strip(os:cmd(Cmd1), both, $\n).
 
+with_retries(WhatFn, RetryFn, NumberOfRetries) ->
+    Res = WhatFn(),
+    case RetryFn(Res) of
+        true ->
+            timer:sleep(200),
+            with_retries(WhatFn, RetryFn, NumberOfRetries - 1);
+        false ->
+            Res
+    end.
 
 cont_ip_raw(Net, Cont) ->
     Cmd = docker_exec(Cont, ip_addr_show_grep_ip(Net)),
-    io:format("Running: ~p~n",[Cmd]),
     cmd(Cmd).
 
 interface_exists(Cont, Intf) ->
+    Cmd = docker_exec(Cont, ip_addr_show_interface_exists(Intf)),
+    case cmd(Cmd) of
+        "no_interface" ->
+            false;
+        _ ->
+            true
+    end.
+
+interface_ip_exists(Cont, Intf) ->
     Cmd = docker_exec(Cont, ip_addr_show_interface_exists(Intf)),
     case cmd(Cmd) of
         "no_interface" ->
@@ -130,17 +159,20 @@ ip_addr_show_grep_ip(Intf) ->
 
 
 add_entry_to_etc_hosts(Ip, Name) ->
-    lists:flatten(io_lib:format("echo ' ~s ~p >> /etc/hosts", [Ip, Name])).
+    lists:flatten(io_lib:format("bash -c \"echo  '~s ~p' >> /etc/hosts\"", [Ip, Name])).
 
 curl(Json, Path) ->
     lists:flatten(
       io_lib:format("curl -d '~s' ~s~s", [Json,
                                           application:get_env(env_helper,
                                                               lev_ip,
-                                                              "localhost:8080"),
+                                                              "192.168.99.100:8080"),
                                           Path])).
 
 ip_addr_show_interface_exists(Intf) ->
+    "ip addr show " ++ atom_to_list(Intf) ++ " 2> /dev/null || echo \"no_interface\"".
+
+ip_addr_show_interface_ip_exists(Intf) ->
     "ip addr show " ++ atom_to_list(Intf) ++ " 2> /dev/null || echo \"no_interface\"".
 
 
